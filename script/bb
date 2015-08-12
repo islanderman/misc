@@ -1,0 +1,75 @@
+#!/bin/sh
+
+function clean() {
+  find . -type d -maxdepth 1 -mindepth 1 -exec bash -c "cd '{}' && pwd && mvn clean" \;
+}
+
+function pull() {
+  find . -type d -maxdepth 1 -mindepth 1 -exec bash -c "cd '{}' && pwd && git pull" \;
+}
+
+function compile() {
+  find . -type d -maxdepth 1 -mindepth 1 -exec bash -c "cd '{}' && pwd && mvn -fae clean compile install" \;
+}
+
+function status() {
+  find . -type d -maxdepth 1 -mindepth 1 -exec bash -c "cd '{}' && pwd && git status" \;
+}
+
+function finding() {
+  find . -type d -maxdepth 1 -mindepth 1 -exec bash -c "cd '{}' && git grep $1" \;
+}
+
+case "$1" in 
+    status)
+        status
+        ;;
+    clean)
+        clean
+        ;;
+    all)
+        pull 
+        compile
+        ;;    
+    pull)
+        pull
+        ;;
+    find)
+        finding $2
+    	;;
+    compile|build)
+        compile
+        ;;
+    *)
+    if [ -d "$1" ]; then
+        cd $1
+        
+        case "$2" in
+            clean)
+                mvn clean
+                ;;
+            pull)
+                git pull
+                ;;
+            build|compile|'')
+                mvn clean compile install
+                ;;
+            src)
+                mvn generate-sources
+                ;;
+            all)
+                git pull
+                mvn clean compile install
+                ;;
+            *)
+                echo "error mesg: $2"
+                ;; 
+        esac
+    else 
+        echo "Not supported."
+    fi
+esac
+
+
+
+
