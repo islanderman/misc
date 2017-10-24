@@ -32,7 +32,8 @@ export FZF_DEFAULT_COMMAND='
 alias mkdir='mkdir -p'
 alias ls='ls -hGF '
 alias mvn="mvn -T 2C"
-alias youtube-dl='youtube-dl --external-downloader aria2c --external-downloader-args "-x 4" '
+alias youtube-dl='youtube-dl --external-downloader aria2c --external-downloader-args "-x 4" -o "%(title)s.%(ext)s" '
+
 #alias load='fzf --height 40% --reverse --preview "file {}" --preview-window down:1'
 alias load='fzf --height 60% --preview  '\''[[ $(file --mime {}) =~ binary ]] &&
                  echo {} is a binary file ||
