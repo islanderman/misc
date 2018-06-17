@@ -1,0 +1,12 @@
+#!/bin/sh
+brew prune
+brew missing
+brew update
+brew upgrade 
+brew cu -a
+brew cleanup -s
+brew cask cleanup
+brew missing
+brew doctor
+
+mas upgrade
