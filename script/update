@@ -3,7 +3,7 @@ brew prune
 brew missing
 brew update
 brew upgrade 
-brew cu -a
+brew cu -acy
 brew cleanup -s
 brew cask cleanup
 brew missing
