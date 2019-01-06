@@ -2849,7 +2849,6 @@ appinn.com
 appinn.me
 appjiagu.com
 appkefu.com
-apple.com
 apple2003.com
 apple4.us
 applepie.cc
@@ -3011,7 +3010,6 @@ baicmotor.com
 baidajob.com
 baidao.com
 baidu-tongji.com
-baidu.com
 baidu.nu
 baidubce.com
 baidubtt.com
@@ -4396,7 +4394,6 @@ cn.bing.com
 cn.bing.net
 cn.coremetrics.com
 cn.debian.org
-cn.download.nvidia.com
 cn.img.stb.s-msn.com
 cn.msn.com
 cn.service.weather.msn.com.mwcname.com
@@ -5123,7 +5120,6 @@ djye.com
 djyjob.com
 dker.cc
 dl.delivery.mp.microsoft.com
-dl.google.com
 dl1234.com
 dlassets-ssl.xboxlive.com
 dlassets.xboxlive.com
@@ -5246,12 +5242,6 @@ downcc.com
 downg.com
 downhot.com
 downkr.com
-download-ssl.xbox.com
-download.gfe.nvidia.com
-download.microsoft.com
-download.windowsupdate.com
-download.xbox.com
-download.xboxlive.com
 downxunlei.com
 downyi.com
 doyoo.net
@@ -6002,7 +5992,6 @@ gkstk.com
 glanimaltrade.com
 glinfo.com
 glmama.com
-global-download.acer.com
 globalbuy.cc
 globeimmi.com
 glodon.com
@@ -7013,7 +7002,6 @@ ini3e.com
 inimc.com
 insun-china.com
 intelliscoring.org
-international.download.nvidia.com
 intil.biz
 invescogreatwall.com
 inweke.com
