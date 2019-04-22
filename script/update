@@ -1,12 +1,18 @@
 #!/bin/sh
-brew prune
+#echo "ssh to update clusters"
+#echo "  - Updating local clusters"
+#ansible-playbook ~/ansible/rasp.yml --inventory=~/ansible/hosts &
+#ansible-playbook ~/ansible/rock.yml --inventory=~/ansible/hosts -K
+
+echo "Now Updating this Mac"
+softwareupdate -i -a
 brew missing
 brew update
 brew upgrade 
 brew cu -acy
 brew cleanup -s
-brew cask cleanup
-brew missing
+rm -rf $(brew --cache)
 brew doctor
 
 mas upgrade
+
