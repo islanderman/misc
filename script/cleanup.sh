@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for TYPE in 'java' 'xml' 'sh' 'json'
+for TYPE in 'java' 'sh' 'json'
 do
 
 echo *.$TYPE
@@ -15,3 +15,6 @@ echo *.$TYPE
     fi
 
 done
+
+git pull origin develop; git remote update --prune; git branch --merged | egrep -v "(^\*|master|dev)" | xargs git branch -d
+git checkout -q develop && git for-each-ref refs/heads/ "--format=%(refname:short)" | while read branch; do mergeBase=$(git merge-base develop $branch) && [[ $(git cherry develop $(git commit-tree $(git rev-parse $branch\^{tree}) -p $mergeBase -m _)) == "-"* ]] && git branch -D $branch; done
