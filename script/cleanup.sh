@@ -16,5 +16,12 @@ echo *.$TYPE
 
 done
 
+
+git reflog expire --expire=now --all
+git fsck --full --unreachable
+git prune 
+git repack -a -d --depth=250 --window=250
+git gc --prune=now
+
 git pull origin develop; git remote update --prune; git branch --merged | egrep -v "(^\*|master|dev)" | xargs git branch -d
 git checkout -q develop && git for-each-ref refs/heads/ "--format=%(refname:short)" | while read branch; do mergeBase=$(git merge-base develop $branch) && [[ $(git cherry develop $(git commit-tree $(git rev-parse $branch\^{tree}) -p $mergeBase -m _)) == "-"* ]] && git branch -D $branch; done
