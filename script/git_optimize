@@ -1,0 +1,120 @@
+#!/bin/bash
+
+set -e  # Exit immediately if a command exits with a non-zero status.
+
+verbose=false
+if [[ "$1" == "-v" ]]; then
+    verbose=true
+fi
+
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Function to execute commands and handle errors
+run_command() {
+    if $verbose; then
+        "$@"
+    else
+        if ! output=$("$@" 2>&1); then
+            echo "Error executing: $*" >&2
+            echo "Output: $output" >&2
+            return 1
+        fi
+    fi
+}
+
+# Function to print messages only in verbose mode
+print_verbose() {
+    if $verbose; then
+        echo -e "${CYAN}$1${NC}"
+    fi
+}
+
+# Function to print formatted messages
+print_message() {
+    if $verbose; then
+        echo -e "\n${BLUE}==== $1 ====${NC}"
+    fi
+}
+
+# Variables for progress bar
+progress=0
+progress_bar_width=30
+status_text=""
+
+# Function to update progress bar and status
+update_progress() {
+    local new_progress=$1
+    local new_status=$2
+    progress=$new_progress
+    status_text=$new_status
+    if ! $verbose; then
+        local filled_width=$((progress * progress_bar_width / 100))
+        local empty_width=$((progress_bar_width - filled_width))
+        printf "\r\033[K[%s%s] ${CYAN}%3d%%${NC} | ${GREEN}%s${NC}" \
+               "$(printf '#%.0s' $(seq 1 $filled_width))" \
+               "$(printf ' %.0s' $(seq 1 $empty_width))" \
+               "$progress" \
+               "$status_text"
+    fi
+}
+
+# Update PATH
+export PATH=$PATH:/opt/homebrew/bin
+
+# Calculate threads based on CPU cores
+cores=$(sysctl -n hw.ncpu)
+threads=$((cores * 2))
+
+print_message "Starting Git Repository Optimization"
+print_verbose "Current directory: $(pwd)"
+print_verbose "Using $threads threads (based on $cores CPU cores)"
+
+update_progress 0 "Initializing..."
+
+print_message "Configuring Git Settings"
+run_command git config --global index.threads $threads
+run_command git config --global pack.threads $threads
+run_command git config --global grep.threads $threads
+run_command git config --global fetch.parallel $threads
+run_command git config --global http.postBuffer 524288000
+run_command git config --global protocol.version 2
+run_command git config --local core.compression 9
+run_command git config --local core.deltaBaseCacheLimit 2g
+run_command git config --local gc.auto 256
+run_command git config --local gc.autoPackLimit 50
+
+update_progress 20 "Git settings configured"
+
+print_message "Optimizing Repository"
+print_verbose "Running garbage collection and maintenance tasks..."
+run_command git gc --aggressive --prune=now
+update_progress 40 "Garbage collection complete"
+run_command git maintenance run --task=gc --auto
+run_command git maintenance start
+update_progress 60 "Maintenance tasks finished"
+run_command git reflog expire --expire=now --expire-unreachable=now --all
+run_command git fsck --full --unreachable
+run_command git prune
+run_command git repack -a -d --depth=250 --window=250
+
+update_progress 80 "Repository optimized"
+
+print_verbose "Cleaning up and updating..."
+run_command git clean -fdx
+run_command git remote prune origin
+run_command git fetch --all --prune
+
+print_verbose "Verifying repository integrity..."
+run_command git fsck --full
+
+update_progress 100 "Optimization complete"
+
+echo  # Add a newline after the progress bar
+print_message "Git Repository Optimization Complete"
