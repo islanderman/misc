@@ -1,26 +1,123 @@
-#!/bin/zsh
+#!/bin/bash
 
-# Set Git configuration globally
-git config --global index.threads "16"
-git config --global pack.threads "16"
-git config --global grep.threads "16"
-git config --global http.postBuffer "524288000"
-git config --global protocol.version 2
+verbose=false
+if [[ "$1" == "-v" ]]; then
+    verbose=true
+fi
 
-# Find all Git repositories and store them in an array
-ARRAY=( $(find $(brew --prefix) -name .git) )
+# Color definitions
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to display overall progress
+display_overall_progress() {
+    if ! $verbose; then
+        local current="$1"
+        local total="$2"
+        local status="$3"
+        if [[ -z "$total" || "$total" -le 0 ]]; then
+            echo "Error: Invalid total value ($total)" >&2
+            return 1
+        fi
+        local progress=$((current * 100 / total))
+        local filled_width=$((progress * 50 / 100))
+        local empty_width=$((50 - filled_width))
+        printf "\r\033[K[%s%s] ${CYAN}%3d%%${NC} | ${GREEN}%s${NC}" \
+               "$(printf '#%.0s' $(seq 1 $filled_width))" \
+               "$(printf ' %.0s' $(seq 1 $empty_width))" \
+               "$progress" \
+               "$status"
+    fi
+}
+
+# Find all valid Git repositories
+ARRAY=()
+while IFS= read -r -d '' git_dir; do
+    if git -C "$(dirname "$git_dir")" rev-parse --git-dir > /dev/null 2>&1; then
+        ARRAY+=("$git_dir")
+    fi
+done < <(find $(brew --prefix) -name .git -print0)
+
+total_repos=${#ARRAY[@]}
+homebrew_steps=2
+total_steps=$((total_repos + homebrew_steps))
+
+if [[ $total_steps -le 2 ]]; then
+    echo "Error: No repositories found and no steps to perform." >&2
+    exit 1
+fi
 
 # Define a function to optimize a Git repository
 git_optimize() {
-  git optimize
+    repo_path=$(dirname "$1")
+    repo_name=$(basename "$repo_path")
+    if $verbose; then
+        echo "Optimizing repository: $repo_name (Path: $repo_path)"
+
+        echo "Setting Git configurations for $repo_name"
+        git -C "$repo_path" config core.compression 9
+        git -C "$repo_path" config gc.auto 256
+        git -C "$repo_path" config receive.autogc false
+
+        echo "Running git_optimize script for $repo_name"
+        (cd "$repo_path" && bash ~/scripts/git_optimize -v)
+
+        echo "Optimization complete for: $repo_name"
+    else
+        git -C "$repo_path" config core.compression 9 > /dev/null 2>&1
+        git -C "$repo_path" config gc.auto 256 > /dev/null 2>&1
+        git -C "$repo_path" config receive.autogc false > /dev/null 2>&1
+        (cd "$repo_path" && bash ~/scripts/git_optimize > /dev/null 2>&1)
+    fi
 }
 
-# Export the function so that it can be used by parallel
+# Export the function and variables so that they can be used by parallel
 export -f git_optimize
+export verbose
+export -f display_overall_progress
+export total_steps
 
 # Use parallel to optimize Git repositories in parallel
-echo $ARRAY | tr ' ' '\n' | parallel -j 4 -I{} 'cd {}; git_optimize'
+if $verbose; then
+    printf '%s\0' "${ARRAY[@]}" | parallel -0 -j 8 git_optimize {}
+else
+    printf '%s\0' "${ARRAY[@]}" | parallel -0 -j 8 --silent git_optimize {}
+    for i in $(seq 1 $total_repos); do
+        display_overall_progress "$i" "$total_steps" "Optimized $i/$total_repos repos"
+        sleep 0.1  # Add a small delay to make the progress visible
+    done
+fi
 
-# Perform other tasks (e.g., brew update, upgrade, cleanup)
-brew update; brew upgrade; brew cu -a
-brew cleanup --prune=all -s
+current_step=$total_repos
+
+# Homebrew update and upgrade
+if $verbose; then
+    echo "Updating and upgrading Homebrew packages"
+    brew update && brew upgrade && brew cu -a
+else
+    display_overall_progress $((current_step + 1)) "$total_steps" "Updating Homebrew packages"
+    { brew update && brew upgrade && brew cu -a; } > /dev/null 2>&1
+fi
+
+# Homebrew cleanup
+if $verbose; then
+    echo "Performing Homebrew cleanup"
+    brew cleanup --prune=all -s
+else
+    display_overall_progress $((current_step + 2)) "$total_steps" "Cleaning up Homebrew"
+    brew cleanup --prune=all -s > /dev/null 2>&1
+fi
+
+# Final progress update to ensure 100% is displayed
+if ! $verbose; then
+    display_overall_progress "$total_steps" "$total_steps" "Optimization complete"
+fi
+
+# Simplified completion message
+echo -e "\n${YELLOW}Optimization Process Summary:${NC}"
+echo -e "${BLUE}Repository Optimization:${NC}"
+echo "   - Total repositories processed: $total_repos"
+echo -e "\n${GREEN}All tasks have been successfully completed. Your development environment is now optimized for peak performance.${NC}"
