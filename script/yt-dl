@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Check if a URL is provided as an argument
+if [ -z "$1" ]; then
+    echo "Usage: $0 <video_url>"
+    exit 1
+fi
+
+# Assign the URL parameter to a variable
+VIDEO_URL="$1"
+
+# Define the control file for pausing/resuming
+CONTROL_FILE="pause.txt"
+
+# Function to check for pause signal
+check_pause() {
+    while [ -f "$CONTROL_FILE" ]; do
+        echo "Download paused. Remove '$CONTROL_FILE' to resume."
+        sleep 5
+    done
+}
+
+# Define the yt-dlp command with consolidated options
+yt-dlp \
+    --retry-sleep fragment:exp=1:20 \
+    --embed-metadata --embed-thumbnail --embed-chapters \
+    --merge-output-format mp4 \
+    --buffer-size 16K \
+    --limit-rate 5M \
+    -N 5 \
+    -f "bestvideo+bestaudio/best" \
+    --audio-format best \
+    --audio-quality 0 \
+    --progress \
+    --add-metadata \
+    --output "%(title)s [%(id)s].%(ext)s" \
+    --download-archive downloaded_videos.txt \
+    --throttled-rate 200K \
+    "$VIDEO_URL" &
+
+# Monitor the download process and check for pause signals
+YT_DLP_PID=$!
+
+while kill -0 $YT_DLP_PID 2>/dev/null; do
+    check_pause
+    sleep 1
+done
+
+wait $YT_DLP_PID
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "Download completed successfully."
+else
+    echo "Download interrupted or failed with exit code $EXIT_CODE."
+fi

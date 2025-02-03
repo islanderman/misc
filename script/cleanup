@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+
+#set -e  # Exit immediately if a command exits with a non-zero status.
+# set -x # debugging
+
+# Function to check if the current directory is a git repository
+is_git_directory() {
+    git rev-parse --is-inside-work-tree > /dev/null 2>&1
+}
+
+# Check if the current directory is a git repository
+if ! is_git_directory; then
+    echo "Not a git directory."
+    exit 1
+fi
+
+verbose=false
+if [[ "$1" == "-v" ]]; then
+    verbose=true
+fi
+
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Function to execute commands and handle errors
+run_command() {
+    if $verbose; then
+        "$@"
+    else
+        if ! output=$("$@" 2>&1); then
+            echo "Error executing: $*" >&2
+            echo "Output: $output" >&2
+            return 1
+        fi
+    fi
+}
+
+# Function to print messages only in verbose mode
+print_verbose() {
+    if $verbose; then
+        echo -e "${CYAN}$1${NC}"
+    fi
+}
+
+# Function to print formatted messages
+print_message() {
+    if $verbose; then
+        echo -e "\n${BLUE}==== $1 ====${NC}"
+    fi
+}
+
+# Variables for progress bar (shared)
+progress=0
+progress_bar_width=30
+
+# Function to update progress bar and status (shared)
+update_progress() {
+    local new_progress=$1
+    local new_status=$2
+
+    progress=$new_progress
+
+    if ! $verbose; then
+        local filled_width=$((progress * progress_bar_width / 100))
+        local empty_width=$((progress_bar_width - filled_width))
+        printf "\r\033[K[%s%s] ${CYAN}%3d%%${NC} | ${GREEN}%s${NC}" \
+               "$(printf '#%.0s' $(seq 1 $filled_width))" \
+               "$(printf ' %.0s' $(seq 1 $empty_width))" \
+               "$progress" \
+               "$new_status"
+    fi
+}
+
+# Update PATH (if needed)
+export PATH=$PATH:/opt/homebrew/bin
+
+# Calculate threads based on CPU cores (for optimization)
+cores=$(sysctl -n hw.ncpu)
+threads=$((cores * 2))
+
+### Start Cleanup Process ###
+print_message "Starting Cleanup Process"
+print_verbose "Current directory: $(pwd)"
+print_verbose "Using $threads threads (based on $cores CPU cores)"
+
+update_progress 5 "Initializing..."
+
+### Git Optimization Section (Integrated from git_optimize) ###
+
+print_message "Configuring Git Settings"
+
+set_git_config() {
+    local scope="$1"
+    local key="$2"
+    local value="$3"
+
+    # Check if the config key already has a value
+    existing_value=$(git config --$scope --get "$key" 2>/dev/null)
+
+    if [ -z "$existing_value" ]; then
+        # Set the config value if it doesn't exist
+        run_command git config --$scope "$key" "$value"
+        print_verbose "Set $scope $key to $value"
+    else
+        print_verbose "$scope $key is already set to $existing_value, skipping..."
+    fi
+}
+
+set_git_config global index.threads $threads
+set_git_config global pack.threads $threads
+set_git_config global grep.threads $threads
+set_git_config global fetch.parallel $threads
+set_git_config global http.postBuffer 524288000
+set_git_config global protocol.version 2
+
+set_git_config local core.compression 9
+set_git_config local core.deltaBaseCacheLimit 2g
+set_git_config local gc.auto 256
+set_git_config local gc.autoPackLimit 50
+
+update_progress 15 "Git settings configured"
+
+print_message "Optimizing Repository"
+print_verbose "Running garbage collection and maintenance tasks..."
+run_command git gc --aggressive --prune=now
+update_progress 20 "Garbage collection complete"
+
+run_command git repack -a -d --depth=250 --window=250
+update_progress 30 "Repository optimized"
+print_verbose "Cleaning up and updating..."
+
+update_progress 40 "Cleaning up and updating..."
+run_command git clean -fdx
+run_command git remote prune origin
+run_command git fetch --all --prune
+
+### Additional Cleanup Tasks ###
+
+print_message "Performing Additional Cleanup Tasks"
+
+update_progress 50 "Pulling latest changes from develop branch..."
+run_command git pull --rebase origin develop
+
+update_progress 60 "Pruning remote branches..."
+run_command git remote update --prune
+
+update_progress 70 "Deleting merged branches..."
+git branch --merged | egrep -v "(^\*|master|main|dev)" | xargs --no-run-if-empty run_command git branch -d
+
+update_progress 75 "Cleaning up stale branches..."
+git checkout -q develop && \
+git for-each-ref refs/heads/ "--format=%(refname:short)" | while read branch; do \
+   mergeBase=$(git merge-base develop $branch) && \
+   [[ $(git cherry develop $(git commit-tree $(git rev-parse $branch^{tree}) -p $mergeBase -m _)) == "-"* ]] && \
+   run_command git branch -D $branch;
+done
+
+update_progress 90 "Final maintenance tasks..."
+run_command git reflog expire --expire=now --expire-unreachable=now --all
+run_command git fsck --full --unreachable
+run_command git prune
+run_command git repack -a -d --depth=250 --window=250
+
+update_progress 100 "Cleanup process complete"
+
+echo # Add newline after progress bar finishes.
+print_message "Cleanup Process Complete"
